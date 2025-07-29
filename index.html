@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive POC: Centralized Backup & Data Analysis System</title>
+    <title>Interactive POC: Incremental Backup System (v2)</title>
     <!-- Chosen Palette: Slate Gray & Muted Blue -->
-    <!-- Application Structure Plan: A single-page dashboard design with top navigation to scroll to thematic sections. The core is an interactive architecture diagram and an animated workflow visualization. This structure is chosen to make a dense, technical plan digestible and to clarify the relationships and processes between components, which is more effective for user understanding than a linear document. Key interactions include clicking diagram elements for details, playing the workflow animation, and viewing code in a tabbed interface. -->
+    <!-- Application Structure Plan: A single-page dashboard with top navigation to scroll to thematic sections. The design prioritizes explaining the *process* of incremental backups. Key features include an interactive architecture diagram, a dedicated section explaining the 'updated_at' prerequisite, and an animated workflow visualization. This structure is chosen to make a complex technical process intuitive and visually engaging, which is more effective for understanding than a static document. -->
     <!-- Visualization & Content Choices: 
-        - Architecture Diagram: Report Info -> System Components -> Goal: Organize/Relate -> Viz: Interactive HTML/CSS diagram -> Interaction: Click to show details in a modal -> Justification: More engaging and informative than a static image, keeps user in context.
-        - Backup Workflow: Report Info -> Backup/Restore Scripts -> Goal: Change/Process -> Viz: Animated sequence with a Chart.js progress bar -> Interaction: Play/pause buttons to control flow -> Justification: Turns a complex script logic into an easy-to-follow visual story.
-        - Configuration Files: Report Info -> Code blocks (YAML, Python, Shell) -> Goal: Inform -> Viz: Tabbed code viewer -> Interaction: Click tabs to switch files, copy button -> Justification: Organizes lengthy code snippets cleanly and improves usability.
-        - Next Steps: Report Info -> List of tasks -> Goal: Organize -> Viz: Interactive checklist -> Interaction: Click to toggle checkmark -> Justification: Makes the action plan feel more tangible and trackable for the user.
+        - Architecture Diagram: Report Info -> System Components -> Goal: Organize/Relate -> Viz: Interactive HTML/CSS diagram -> Interaction: Click for details -> Justification: More engaging than a static image.
+        - 'updated_at' Prerequisite: Report Info -> SQL Schema Change -> Goal: Inform/Emphasize -> Viz: Highlighted code block -> Interaction: Copy code -> Justification: Isolates and clarifies the single most important concept for incremental backups.
+        - Incremental Workflow: Report Info -> Client/Server Scripts -> Goal: Change/Process -> Viz: Animated sequence with data flow -> Interaction: Play/pause buttons -> Justification: Turns the complex script logic into an easy-to-follow visual story, showing *what* data moves, not just that it moves.
+        - Configuration Files: Report Info -> Code blocks (YAML, Python, Shell) -> Goal: Inform -> Viz: Tabbed code viewer -> Interaction: Switch tabs, copy code -> Justification: Organizes lengthy code snippets cleanly.
     -->
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -26,9 +26,6 @@
         .nav-link {
             transition: color 0.3s, border-bottom-color 0.3s;
         }
-        .nav-link:hover {
-            color: #3b82f6; /* blue-500 */
-        }
         .nav-link.active {
             color: #3b82f6; /* blue-500 */
             border-bottom-color: #3b82f6;
@@ -38,165 +35,108 @@
             background-color: #94a3b8; /* slate-400 */
             z-index: 0;
         }
-        .diagram-arrow.right {
-            width: calc(100% - 10rem); left: 5rem; height: 2px; top: 50%; transform: translateY(-50%);
-        }
-        .diagram-arrow.down {
-            height: 50px; width: 2px; left: 50%; transform: translateX(-50%);
-        }
+        .diagram-arrow.right { width: calc(100% - 10rem); left: 5rem; height: 2px; top: 50%; transform: translateY(-50%); }
+        .diagram-arrow.down { height: 50px; width: 2px; left: 50%; transform: translateX(-50%); }
         .diagram-arrow::after {
-            content: '';
+            content: ''; position: absolute; border: solid #94a3b8;
+            border-width: 0 2px 2px 0; display: inline-block; padding: 4px;
+        }
+        .diagram-arrow.right::after { right: -1px; top: -4px; transform: rotate(-45deg); }
+        .diagram-arrow.down::after { bottom: -1px; left: -4px; transform: rotate(45deg); }
+        .workflow-step.active { border-color: #3b82f6; background-color: #eff6ff; }
+        .workflow-step.active .step-icon { background-color: #3b82f6; color: white; }
+        .tab.active { border-color: #3b82f6; color: #3b82f6; background-color: white; }
+        .code-highlight { background-color: rgba(59, 130, 246, 0.1); }
+        .data-packet {
             position: absolute;
-            border: solid #94a3b8;
-            border-width: 0 2px 2px 0;
-            display: inline-block;
-            padding: 4px;
-        }
-        .diagram-arrow.right::after {
-            right: -1px; top: -4px; transform: rotate(-45deg);
-        }
-        .diagram-arrow.down::after {
-            bottom: -1px; left: -4px; transform: rotate(45deg);
-        }
-        .workflow-step.active {
-            border-color: #3b82f6;
-            background-color: #eff6ff;
-        }
-        .workflow-step.active .step-icon {
-            background-color: #3b82f6;
+            left: 20%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #f59e0b;
             color: white;
-        }
-        .tab.active {
-            border-color: #3b82f6;
-            color: #3b82f6;
-            background-color: white;
-        }
-        .checklist-item.checked {
-            text-decoration: line-through;
-            color: #64748b; /* slate-500 */
-        }
-        .checklist-item.checked .check-icon {
-            background-color: #22c55e; /* green-500 */
-            border-color: #22c55e;
-        }
-        .checklist-item.checked .check-icon::after {
-            opacity: 1;
-        }
-        .check-icon {
-            transition: all 0.2s;
-        }
-        .check-icon::after {
-            content: '✓';
-            color: white;
-            font-size: 14px;
-            line-height: 1;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: bold;
+            z-index: 10;
             opacity: 0;
-            transition: opacity 0.2s;
+            transition: all 1s ease-in-out;
         }
     </style>
 </head>
 <body class="text-slate-700">
 
-    <!-- Header & Navigation -->
     <header class="bg-white/80 backdrop-blur-lg sticky top-0 z-40 border-b border-slate-200">
         <div class="container mx-auto px-4">
             <div class="flex justify-between items-center py-4">
-                <h1 class="text-xl md:text-2xl font-bold text-slate-800">POC: Centralized Backup System</h1>
+                <h1 class="text-xl md:text-2xl font-bold text-slate-800">POC: Incremental Backup System</h1>
                 <nav class="hidden md:flex items-center space-x-6 text-sm font-medium text-slate-600">
                     <a href="#architecture" class="nav-link border-b-2 border-transparent pb-1">Architecture</a>
                     <a href="#workflow" class="nav-link border-b-2 border-transparent pb-1">Workflow</a>
                     <a href="#config" class="nav-link border-b-2 border-transparent pb-1">Configuration</a>
-                    <a href="#specs" class="nav-link border-b-2 border-transparent pb-1">Specifications</a>
                     <a href="#next-steps" class="nav-link border-b-2 border-transparent pb-1">Next Steps</a>
                 </nav>
                 <button id="mobile-menu-btn" class="md:hidden p-2 rounded-md hover:bg-slate-100">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
                 </button>
             </div>
         </div>
-        <!-- Mobile Menu -->
         <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-slate-200">
-            <a href="#architecture" class="block text-sm font-medium text-slate-600 py-3 px-4 hover:bg-slate-50">Architecture</a>
-            <a href="#workflow" class="block text-sm font-medium text-slate-600 py-3 px-4 hover:bg-slate-50">Workflow</a>
-            <a href="#config" class="block text-sm font-medium text-slate-600 py-3 px-4 hover:bg-slate-50">Configuration</a>
-            <a href="#specs" class="block text-sm font-medium text-slate-600 py-3 px-4 hover:bg-slate-50">Specifications</a>
-            <a href="#next-steps" class="block text-sm font-medium text-slate-600 py-3 px-4 hover:bg-slate-50">Next Steps</a>
+            <a href="#architecture" class="mobile-nav-link block text-sm font-medium text-slate-600 py-3 px-4 hover:bg-slate-50">Architecture</a>
+            <a href="#workflow" class="mobile-nav-link block text-sm font-medium text-slate-600 py-3 px-4 hover:bg-slate-50">Workflow</a>
+            <a href="#config" class="mobile-nav-link block text-sm font-medium text-slate-600 py-3 px-4 hover:bg-slate-50">Configuration</a>
+            <a href="#next-steps" class="mobile-nav-link block text-sm font-medium text-slate-600 py-3 px-4 hover:bg-slate-50">Next Steps</a>
         </div>
     </header>
 
     <main class="container mx-auto px-4 py-8 md:py-12">
 
-        <!-- Introduction -->
         <section id="intro" class="text-center mb-16">
-            <h2 class="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Visualizing the System</h2>
-            <p class="max-w-3xl mx-auto text-lg text-slate-600">This interactive application translates the technical proof-of-concept into a visual and explorable format. Use the navigation or scroll to explore the system's architecture, understand the automated backup workflow, and review key configurations.</p>
+            <span class="text-blue-500 font-semibold">V2 - Incremental Backups</span>
+            <h2 class="text-3xl md:text-4xl font-bold text-slate-900 mb-4">A More Efficient System</h2>
+            <p class="max-w-3xl mx-auto text-lg text-slate-600">This interactive application demonstrates the enhanced proof-of-concept, now featuring an efficient **incremental backup strategy**. Explore the architecture and the new workflow that only transfers data that has changed, saving time and bandwidth.</p>
         </section>
 
-        <!-- Architecture Section -->
         <section id="architecture" class="mb-20 pt-16 -mt-16">
             <div class="text-center mb-12">
                 <h2 class="text-3xl font-bold text-slate-900 mb-2">System Architecture</h2>
-                <p class="max-w-2xl mx-auto text-slate-600">This section illustrates the main components of the backup system and their relationships. Click on any component to see a detailed description of its role and responsibilities.</p>
+                <p class="max-w-2xl mx-auto text-slate-600">The core components remain the same, but their interaction is now smarter. Click any component to learn about its role in the incremental backup process.</p>
             </div>
             <div id="diagram" class="relative grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-16 items-center">
-                <!-- Client Laptops -->
-                <div class="diagram-node" data-title="Client Laptops" data-content="These are the source machines (e.g., developer laptops) that generate the data to be backed up. Each client runs a Python script to create a database dump and securely transfer it to the central server.">
+                <div class="diagram-node" data-title="Client Laptops" data-content="Source machines that now intelligently track data changes. Using an 'updated_at' timestamp, the client identifies only new or modified records to include in the backup, creating a small, efficient data packet.">
                     <div class="text-center p-6 bg-white rounded-xl shadow-lg border border-slate-200 cursor-pointer hover:shadow-xl hover:scale-105 transition-all">
-                        <div class="text-4xl mb-3">💻</div>
-                        <h3 class="font-semibold text-slate-800">Client Laptops</h3>
-                        <p class="text-sm text-slate-500">Data Source</p>
+                        <div class="text-4xl mb-3">💻</div><h3 class="font-semibold text-slate-800">Client Laptops</h3><p class="text-sm text-slate-500">Source of Incremental Data</p>
                     </div>
                 </div>
-
-                <!-- Arrow -->
                 <div class="relative h-12 md:h-auto">
-                    <div class="diagram-arrow right hidden md:block"></div>
-                    <div class="diagram-arrow down md:hidden mx-auto"></div>
+                    <div class="diagram-arrow right hidden md:block"></div><div class="diagram-arrow down md:hidden mx-auto"></div>
+                    <div id="data-packet-1" class="data-packet">changes.json</div>
                 </div>
-
-                <!-- Central Server -->
-                <div class="diagram-node" data-title="Central Linux Server" data-content="A dedicated Linux machine that acts as the core of the system. It is responsible for receiving and storing backup files, hosting the Dockerized Production and Engineering databases, and running the automated cron job to process incoming backups.">
+                <div class="diagram-node" data-title="Central Linux Server" data-content="The core server now receives small JSON files containing only data changes. A new server-side script is responsible for parsing these files and 'upserting' the data—updating existing records and inserting new ones—into the central databases.">
                     <div class="text-center p-6 bg-white rounded-xl shadow-lg border border-slate-200 cursor-pointer hover:shadow-xl hover:scale-105 transition-all">
-                        <div class="text-4xl mb-3">🗄️</div>
-                        <h3 class="font-semibold text-slate-800">Central Linux Server</h3>
-                        <p class="text-sm text-slate-500">Backup & DB Host</p>
+                        <div class="text-4xl mb-3">🗄️</div><h3 class="font-semibold text-slate-800">Central Linux Server</h3><p class="text-sm text-slate-500">Receives & Merges Changes</p>
                     </div>
                 </div>
-                
-                <!-- Arrow placeholder for grid -->
+                <div class="hidden md:block"></div><div class="hidden md:block"></div>
+                <div class="relative h-12 md:h-auto"><div class="diagram-arrow down hidden md:block mx-auto"></div></div>
                 <div class="hidden md:block"></div>
-                <div class="hidden md:block"></div>
-
-                <!-- Arrow -->
-                <div class="relative h-12 md:h-auto">
-                    <div class="diagram-arrow down md:hidden mx-auto"></div>
-                    <div class="diagram-arrow down hidden md:block mx-auto"></div>
-                </div>
-                <div class="hidden md:block"></div>
-                
-                <!-- Future Electron App -->
-                <div class="diagram-node md:col-start-2" data-title="Electron App (Future)" data-content="A future desktop application that will provide a user interface for querying and analyzing the data stored in the non-critical Engineering database. This allows for data exploration and business intelligence without any performance impact on the live production system.">
+                <div class="diagram-node md:col-start-2" data-title="Electron App (Future)" data-content="The role of the analysis app remains the same, but it benefits from more up-to-date data, as the incremental process can be run more frequently than full backups. It connects to the Engineering database for safe data exploration.">
                      <div class="text-center p-6 bg-white rounded-xl shadow-lg border border-slate-200 cursor-pointer hover:shadow-xl hover:scale-105 transition-all">
-                        <div class="text-4xl mb-3">📊</div>
-                        <h3 class="font-semibold text-slate-800">Electron App</h3>
-                        <p class="text-sm text-slate-500">Future Data Analysis</p>
+                        <div class="text-4xl mb-3">📊</div><h3 class="font-semibold text-slate-800">Electron App</h3><p class="text-sm text-slate-500">Future Data Analysis</p>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Workflow Section -->
         <section id="workflow" class="mb-20 pt-16 -mt-16">
             <div class="text-center mb-12">
-                <h2 class="text-3xl font-bold text-slate-900 mb-2">Backup & Restoration Workflow</h2>
-                <p class="max-w-2xl mx-auto text-slate-600">This interactive timeline demonstrates the automated daily backup process from start to finish. Press 'Play' to watch the sequence unfold, or step through the process manually.</p>
+                <h2 class="text-3xl font-bold text-slate-900 mb-2">Incremental Backup Workflow</h2>
+                <p class="max-w-2xl mx-auto text-slate-600">This interactive timeline demonstrates the new, efficient backup process. Press 'Play' to see how the system identifies, transfers, and merges only the changed data.</p>
             </div>
             <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
                 <div class="lg:col-span-3 bg-white p-6 rounded-xl shadow-lg border border-slate-200">
                     <h3 class="font-semibold text-lg mb-4 text-slate-800">Workflow Steps</h3>
-                    <div id="workflow-steps-container" class="space-y-4">
-                        <!-- Steps will be injected by JS -->
-                    </div>
+                    <div id="workflow-steps-container" class="space-y-4"></div>
                 </div>
                 <div class="lg:col-span-2">
                     <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-200 mb-6">
@@ -208,318 +148,266 @@
                         <div id="status-text" class="text-slate-600 font-medium h-6">Status: Idle</div>
                     </div>
                     <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-200">
-                        <h3 class="font-semibold text-lg mb-4 text-slate-800">Process Progress</h3>
+                        <h3 class="font-semibold text-lg mb-4 text-slate-800">Data Transferred</h3>
                         <div class="chart-container relative h-24 max-h-24 w-full max-w-full mx-auto">
-                            <canvas id="progressChart"></canvas>
+                            <canvas id="dataChart"></canvas>
                         </div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Configuration Section -->
         <section id="config" class="mb-20 pt-16 -mt-16">
             <div class="text-center mb-12">
-                <h2 class="text-3xl font-bold text-slate-900 mb-2">Configuration Files</h2>
-                <p class="max-w-2xl mx-auto text-slate-600">This section contains the core configuration and script files for the system. Use the tabs to switch between the Docker Compose setup, the client-side backup script, and the server-side processing script.</p>
+                <h2 class="text-3xl font-bold text-slate-900 mb-2">Updated Configuration</h2>
+                <p class="max-w-2xl mx-auto text-slate-600">Review the updated scripts that power the incremental backup logic. The client script now exports JSON, and a new server-side Python script handles the database 'upsert' logic.</p>
             </div>
             <div class="bg-slate-800 rounded-xl shadow-2xl overflow-hidden">
-                <div class="flex border-b border-slate-700">
-                    <button class="tab active text-white font-medium py-3 px-5 text-sm border-b-2" data-target="tab-docker">docker-compose.yml</button>
-                    <button class="tab text-slate-400 font-medium py-3 px-5 text-sm border-b-2 border-transparent" data-target="tab-client">backup_client.py</button>
-                    <button class="tab text-slate-400 font-medium py-3 px-5 text-sm border-b-2 border-transparent" data-target="tab-server">process_backups.sh</button>
+                <div class="flex border-b border-slate-700 flex-wrap">
+                    <button class="tab active text-white font-medium py-3 px-5 text-sm border-b-2" data-target="tab-client">backup_client_incremental.py</button>
+                    <button class="tab text-slate-400 font-medium py-3 px-5 text-sm border-b-2 border-transparent" data-target="tab-server-helper">upsert_data.py (Server)</button>
+                    <button class="tab text-slate-400 font-medium py-3 px-5 text-sm border-b-2 border-transparent" data-target="tab-server-runner">process_backups.sh (Server)</button>
+                    <button class="tab text-slate-400 font-medium py-3 px-5 text-sm border-b-2 border-transparent" data-target="tab-docker">docker-compose.yml</button>
+                    <button class="tab text-slate-400 font-medium py-3 px-5 text-sm border-b-2 border-transparent" data-target="tab-sql">prereq.sql</button>
                 </div>
                 <div class="relative p-6">
-                    <div id="tab-docker" class="tab-content">
-                        <pre><code class="language-yaml text-sm text-slate-300"></code></pre>
-                    </div>
-                    <div id="tab-client" class="tab-content hidden">
-                        <pre><code class="language-python text-sm text-slate-300"></code></pre>
-                    </div>
-                    <div id="tab-server" class="tab-content hidden">
-                        <pre><code class="language-bash text-sm text-slate-300"></code></pre>
-                    </div>
+                    <div id="tab-client" class="tab-content"><pre><code class="language-python text-sm text-slate-300"></code></pre></div>
+                    <div id="tab-server-helper" class="tab-content hidden"><pre><code class="language-python text-sm text-slate-300"></code></pre></div>
+                    <div id="tab-server-runner" class="tab-content hidden"><pre><code class="language-bash text-sm text-slate-300"></code></pre></div>
+                    <div id="tab-docker" class="tab-content hidden"><pre><code class="language-yaml text-sm text-slate-300"></code></pre></div>
+                    <div id="tab-sql" class="tab-content hidden"><pre><code class="language-sql text-sm text-slate-300"></code></pre></div>
                     <button class="copy-btn absolute top-4 right-4 bg-slate-600 hover:bg-slate-500 text-white text-xs font-bold py-1 px-3 rounded-md transition">Copy</button>
                 </div>
             </div>
         </section>
-        
-        <!-- Specifications Section -->
-        <section id="specs" class="mb-20 pt-16 -mt-16">
-            <div class="text-center mb-12">
-                <h2 class="text-3xl font-bold text-slate-900 mb-2">System Specifications</h2>
-                <p class="max-w-2xl mx-auto text-slate-600">A summary of the key hardware and software requirements for the central server, ensuring robust and reliable operation.</p>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-200 text-center">
-                    <div class="text-3xl mb-2">⚙️</div>
-                    <h3 class="font-semibold text-slate-800">Operating System</h3>
-                    <p class="text-slate-600">Ubuntu Server 20.04 LTS or CentOS 8</p>
-                </div>
-                <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-200 text-center">
-                    <div class="text-3xl mb-2">💪</div>
-                    <h3 class="font-semibold text-slate-800">CPU / RAM</h3>
-                    <p class="text-slate-600">4+ Cores / 16GB+ RAM</p>
-                </div>
-                <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-200 text-center">
-                    <div class="text-3xl mb-2">💾</div>
-                    <h3 class="font-semibold text-slate-800">Storage</h3>
-                    <p class="text-slate-600">Sufficient space with RAID recommended</p>
-                </div>
-                <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-200 text-center">
-                    <div class="text-3xl mb-2">🐳</div>
-                    <h3 class="font-semibold text-slate-800">Core Software</h3>
-                    <p class="text-slate-600">Docker & Docker Compose</p>
-                </div>
-            </div>
-        </section>
 
-        <!-- Next Steps Section -->
         <section id="next-steps" class="pt-16 -mt-16">
             <div class="text-center mb-12">
-                <h2 class="text-3xl font-bold text-slate-900 mb-2">Implementation Plan</h2>
-                <p class="max-w-2xl mx-auto text-slate-600">This checklist outlines the sequence of tasks required to deploy the proof-of-concept. Interacting with this list can help track progress during the setup phase.</p>
+                <h2 class="text-3xl font-bold text-slate-900 mb-2">Next Steps</h2>
+                <p class="max-w-2xl mx-auto text-slate-600">The core logic is defined. The next phase involves integrating this process seamlessly into the client-side Electron application for a user-friendly experience.</p>
             </div>
-            <div class="max-w-2xl mx-auto bg-white p-6 rounded-xl shadow-lg border border-slate-200">
-                <div id="checklist" class="space-y-4">
-                    <!-- Checklist items injected by JS -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-200">
+                    <div class="text-3xl mb-2">🖱️</div><h3 class="font-semibold text-slate-800">Create Menu Item</h3><p class="text-slate-600">Add a 'Backup Now' button or menu item in the Electron app.</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-200">
+                    <div class="text-3xl mb-2">⚙️</div><h3 class="font-semibold text-slate-800">Build Settings UI</h3><p class="text-slate-600">Allow users to configure server details from within the app.</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-200">
+                    <div class="text-3xl mb-2">💬</div><h3 class="font-semibold text-slate-800">Provide Feedback</h3><p class="text-slate-600">Show backup status and the last sync time directly in the UI.</p>
                 </div>
             </div>
         </section>
 
     </main>
 
-    <!-- Modal for Diagram Details -->
     <div id="diagram-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4">
         <div id="modal-content" class="bg-white rounded-lg shadow-2xl max-w-lg w-full transform transition-all scale-95 opacity-0">
             <div class="flex justify-between items-center p-4 border-b border-slate-200">
                 <h3 id="modal-title" class="text-lg font-semibold text-slate-800"></h3>
-                <button id="modal-close-btn" class="text-slate-500 hover:text-slate-800">&times;</button>
+                <button id="modal-close-btn" class="text-slate-500 hover:text-slate-800 text-2xl leading-none">&times;</button>
             </div>
-            <div id="modal-body" class="p-6 text-slate-600">
-            </div>
+            <div id="modal-body" class="p-6 text-slate-600"></div>
         </div>
     </div>
 
-    <footer class="text-center py-8 mt-12 border-t border-slate-200">
-        <p class="text-sm text-slate-500">Interactive Proof of Concept</p>
-    </footer>
+    <footer class="text-center py-8 mt-12 border-t border-slate-200"><p class="text-sm text-slate-500">Interactive Proof of Concept v2</p></footer>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
 
-    // Data
     const codeSnippets = {
-        docker: `version: '3.8'
+        client: `import os
+import json
+import subprocess
+from datetime import datetime, timezone
 
+CONFIG_FILE = "backup_config.json"
+TABLE_TO_BACKUP = "your_table"
+SERVER_HOST = "your_central_server_ip"
+# ...
+
+def get_last_backup_time():
+    # ... reads timestamp from CONFIG_FILE
+    
+def set_last_backup_time(timestamp_str):
+    # ... saves timestamp to CONFIG_FILE
+
+def create_incremental_backup(last_backup_time):
+    current_backup_time = datetime.now(timezone.utc)
+    filename = f"incremental_{current_backup_time.strftime('%Y%m%d_%H%M%S')}.json"
+    
+    # In a real app, this would be a DB query:
+    # SELECT * FROM {TABLE_TO_BACKUP} 
+    # WHERE updated_at > '{last_backup_time}';
+    
+    # --- SIMULATED DATA FOR POC ---
+    simulated_data = [
+        {"id": 101, "data": "new data", "updated_at": "2023-10-27T11:00:00Z"},
+        {"id": 45, "data": "updated data", "updated_at": "2023-10-27T11:05:00Z"},
+    ]
+    with open(filename, 'w') as f:
+        json.dump(simulated_data, f)
+    # --- END SIMULATION ---
+    
+    return filename, current_backup_time.isoformat()
+
+# ... main execution logic ...`,
+        serverHelper: `# This script runs on the server.
+import json
+import argparse
+import psycopg2 # Requires installation
+
+def get_db_connection(target):
+    # ... returns connection for 'prod' or 'eng' db
+
+def upsert_data(db_conn, table_name, records):
+    cursor = db_conn.cursor()
+    # PostgreSQL-specific UPSERT query
+    upsert_sql = f"""
+        INSERT INTO {table_name} (id, data, updated_at)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (id) DO UPDATE SET
+            data = EXCLUDED.data,
+            updated_at = EXCLUDED.updated_at;
+    """
+    for record in records:
+        cursor.execute(upsert_sql, (record['id'], record['data'], record['updated_at']))
+    
+    db_conn.commit()
+    cursor.close()
+
+# ... main execution logic ...`,
+        serverRunner: `#!/bin/bash
+
+INCOMING_DIR="/srv/backups/incoming"
+PROCESSED_DIR="/srv/backups/processed"
+HELPER_SCRIPT="/path/to/upsert_data.py"
+
+# Process each new JSON backup file
+for backup_file in $INCOMING_DIR/*.json; do
+    if [ ! -f "$backup_file" ]; then continue; fi
+
+    echo "Processing file: $backup_file"
+
+    # UPSERT into both databases
+    python3 $HELPER_SCRIPT --file "$backup_file" --target prod
+    python3 $HELPER_SCRIPT --file "$backup_file" --target eng
+
+    # Archive the processed file
+    mv "$backup_file" "$PROCESSED_DIR/"
+done`,
+        docker: `version: '3.8'
 services:
-  # Production Database
   production-db:
     image: postgres:14-alpine
     container_name: production_db
     restart: always
     environment:
-      - POSTGRES_USER=prod_user
-      - POSTGRES_PASSWORD=your_strong_production_password
-      - POSTGRES_DB=production_data
+      POSTGRES_USER: prod_user
+      POSTGRES_PASSWORD: your_strong_production_password
+      POSTGRES_DB: production_data
     volumes:
       - ./prod_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-    networks:
-      - db-network
-
-  # Engineering Database
   engineering-db:
     image: postgres:14-alpine
     container_name: engineering_db
     restart: always
     environment:
-      - POSTGRES_USER=eng_user
-      - POSTGRES_PASSWORD=your_strong_engineering_password
-      - POSTGRES_DB=engineering_data
+      POSTGRES_USER: eng_user
+      POSTGRES_PASSWORD: your_strong_engineering_password
+      POSTGRES_DB: engineering_data
     volumes:
       - ./eng_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
-    networks:
-      - db-network
+      - "5433:5432"`,
+        sql: `-- Add the column to track modification times
+ALTER TABLE your_table 
+ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW();
 
-networks:
-  db-network:
-    driver: bridge`,
-        client: `import os
-import subprocess
-from datetime import datetime
+-- Create a function that updates the timestamp
+CREATE OR REPLACE FUNCTION update_timestamp_column()
+RETURNS TRIGGER AS $$
+BEGIN
+   NEW.updated_at = NOW();
+   RETURN NEW;
+END;
+$$ language 'plpgsql';
 
-# --- Configuration ---
-LOCAL_DB_NAME = "local_app_db"
-LOCAL_DB_USER = "local_user"
-BACKUP_FILENAME = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sql"
-
-# Central Server Details
-SERVER_USER = "backup_user"
-SERVER_HOST = "your_central_server_ip"
-SERVER_TARGET_DIR = "/srv/backups/incoming/"
-
-def create_backup():
-    """Dumps the local PostgreSQL database to a .sql file."""
-    print(f"Creating backup for database '{LOCAL_DB_NAME}'...")
-    # ... (implementation)
-
-def transfer_backup():
-    """Transfers the backup file to the central server via SCP."""
-    print(f"Transferring {BACKUP_FILENAME} to {SERVER_HOST}...")
-    # ... (implementation)
-
-def cleanup():
-    """Removes the local backup file after transfer."""
-    # ... (implementation)
-
-if __name__ == "__main__":
-    if create_backup():
-        if transfer_backup():
-            cleanup()`,
-        server: `#!/bin/bash
-
-# --- Configuration ---
-INCOMING_DIR="/srv/backups/incoming"
-PROCESSED_DIR="/srv/backups/processed"
-LOG_FILE="/var/log/backup_processor.log"
-
-PROD_CONTAINER="production_db"
-ENG_CONTAINER="engineering_db"
-
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
-}
-
-log "Starting backup processing run..."
-
-for backup_file in $INCOMING_DIR/*.sql; do
-    log "Processing file: $backup_file"
-
-    # 1. Restore to Production Database
-    docker exec -i $PROD_CONTAINER psql ... < "$backup_file"
-    
-    # 2. Restore to Engineering Database
-    docker exec -i $ENG_CONTAINER psql ... < "$backup_file"
-
-    # 3. Move the processed file
-    mv "$backup_file" "$PROCESSED_DIR/"
-done
-
-log "Backup processing run finished."`
+-- Apply the trigger to your table
+CREATE TRIGGER update_your_table_modtime
+BEFORE UPDATE ON your_table
+FOR EACH ROW
+EXECUTE PROCEDURE update_timestamp_column();`
     };
 
     const workflowSteps = [
-        { icon: '💻', text: 'Client script creates local DB backup (.sql file).' },
-        { icon: '📤', text: 'Client securely transfers backup file to server via SCP.' },
-        { icon: '⏰', text: 'Server cron job triggers the processing script at 2 AM.' },
-        { icon: '📥', text: 'Script restores backup to the Production database.' },
-        { icon: '🔬', text: 'Script restores backup to the Engineering database.' },
-        { icon: '🗂️', text: 'Script moves the processed backup file to the archive.' },
-        { icon: '✅', text: 'Workflow complete. Awaiting next cycle.' }
+        { icon: '🕒', text: 'Client reads last backup time from local config.' },
+        { icon: '🔍', text: 'Queries local DB for records where updated_at > last backup time.' },
+        { icon: '📦', text: 'Packages only the new/updated records into a small JSON file.' },
+        { icon: '📤', text: 'Client securely transfers the JSON file to the server.' },
+        { icon: '⚙️', text: 'Server script parses the JSON file.' },
+        { icon: '🔄', text: 'Performs "UPSERT" to merge changes into the central databases.' },
+        { icon: '💾', text: 'Client saves the new backup time to its local config file.' },
+        { icon: '✅', text: 'Incremental backup complete.' }
     ];
 
-    const checklistItems = [
-        "Provision and configure the central Linux server.",
-        "Install Docker and Docker Compose.",
-        "Set up the directory structure and docker-compose.yml file.",
-        "Launch the database containers.",
-        "Configure passwordless SSH for the backup_user.",
-        "Deploy and test the client-side backup script.",
-        "Set up the server-side processing script and cron job.",
-        "Manually run a full backup/restore cycle to validate."
-    ];
-
-    // Mobile Menu
     const mobileMenuBtn = document.getElementById('mobile-menu-btn');
     const mobileMenu = document.getElementById('mobile-menu');
-    mobileMenuBtn.addEventListener('click', () => {
-        mobileMenu.classList.toggle('hidden');
-    });
-    mobileMenu.addEventListener('click', () => {
-        mobileMenu.classList.add('hidden');
+    mobileMenuBtn.addEventListener('click', () => mobileMenu.classList.toggle('hidden'));
+    document.querySelectorAll('.mobile-nav-link').forEach(link => {
+        link.addEventListener('click', () => mobileMenu.classList.add('hidden'));
     });
 
-    // Nav Link Highlighting on Scroll
     const sections = document.querySelectorAll('section');
     const navLinks = document.querySelectorAll('header nav a');
     window.addEventListener('scroll', () => {
         let current = '';
         sections.forEach(section => {
-            const sectionTop = section.offsetTop;
-            if (pageYOffset >= sectionTop - 80) {
-                current = section.getAttribute('id');
-            }
+            if (pageYOffset >= section.offsetTop - 80) current = section.id;
         });
-
         navLinks.forEach(link => {
-            link.classList.remove('active');
-            if (link.getAttribute('href').includes(current)) {
-                link.classList.add('active');
-            }
+            link.classList.toggle('active', link.getAttribute('href').includes(current));
         });
     });
 
-    // Diagram Modal Logic
     const diagramModal = document.getElementById('diagram-modal');
     const modalContent = document.getElementById('modal-content');
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalCloseBtn = document.getElementById('modal-close-btn');
-
-    document.querySelectorAll('.diagram-node').forEach(node => {
-        node.addEventListener('click', () => {
-            modalTitle.textContent = node.dataset.title;
-            modalBody.textContent = node.dataset.content;
-            diagramModal.classList.remove('hidden');
-            diagramModal.classList.add('flex');
-            setTimeout(() => {
-                modalContent.classList.remove('scale-95', 'opacity-0');
-            }, 10);
-        });
-    });
-
     const closeModal = () => {
         modalContent.classList.add('scale-95', 'opacity-0');
-        setTimeout(() => {
-            diagramModal.classList.add('hidden');
-            diagramModal.classList.remove('flex');
-        }, 200);
+        setTimeout(() => diagramModal.classList.add('hidden'), 200);
     };
-
-    modalCloseBtn.addEventListener('click', closeModal);
-    diagramModal.addEventListener('click', (e) => {
-        if (e.target === diagramModal) {
-            closeModal();
-        }
+    document.querySelectorAll('.diagram-node').forEach(node => {
+        node.addEventListener('click', () => {
+            document.getElementById('modal-title').textContent = node.dataset.title;
+            document.getElementById('modal-body').textContent = node.dataset.content;
+            diagramModal.classList.remove('hidden');
+            setTimeout(() => modalContent.classList.remove('scale-95', 'opacity-0'), 10);
+        });
     });
+    document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+    diagramModal.addEventListener('click', e => { if (e.target === diagramModal) closeModal(); });
 
-    // Configuration Tabs
     const tabs = document.querySelectorAll('.tab');
     const tabContents = document.querySelectorAll('.tab-content');
     const copyBtn = document.querySelector('.copy-btn');
-
-    document.querySelector('#tab-docker code').textContent = codeSnippets.docker;
     document.querySelector('#tab-client code').textContent = codeSnippets.client;
-    document.querySelector('#tab-server code').textContent = codeSnippets.server;
-
+    document.querySelector('#tab-server-helper code').textContent = codeSnippets.serverHelper;
+    document.querySelector('#tab-server-runner code').textContent = codeSnippets.serverRunner;
+    document.querySelector('#tab-docker code').textContent = codeSnippets.docker;
+    document.querySelector('#tab-sql code').textContent = codeSnippets.sql;
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
             tabs.forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
-            tabContents.forEach(content => {
-                content.classList.add('hidden');
-            });
+            tabContents.forEach(c => c.classList.add('hidden'));
             document.getElementById(tab.dataset.target).classList.remove('hidden');
         });
     });
-    
     copyBtn.addEventListener('click', () => {
-        const activeTab = document.querySelector('.tab.active');
-        const activeContent = document.querySelector(`#${activeTab.dataset.target} code`).textContent;
+        const activeContent = document.querySelector('.tab.active + .tab-content, .tab.active ~ .tab-content:not(.hidden) code').textContent;
         const textarea = document.createElement('textarea');
         textarea.value = activeContent;
         document.body.appendChild(textarea);
@@ -528,21 +416,16 @@ log "Backup processing run finished."`
             document.execCommand('copy');
             copyBtn.textContent = 'Copied!';
             setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
-        } catch (err) {
-            console.error('Failed to copy text: ', err);
-        }
+        } catch (err) { console.error('Failed to copy'); }
         document.body.removeChild(textarea);
     });
 
-    // Workflow Animation
     const stepsContainer = document.getElementById('workflow-steps-container');
     const playPauseBtn = document.getElementById('play-pause-btn');
     const resetBtn = document.getElementById('reset-btn');
     const statusText = document.getElementById('status-text');
-    let progressChart;
-    let currentStep = -1;
-    let isPlaying = false;
-    let intervalId;
+    const dataPacket = document.getElementById('data-packet-1');
+    let dataChart, currentStep = -1, isPlaying = false, intervalId;
 
     const initWorkflow = () => {
         stepsContainer.innerHTML = workflowSteps.map((step, index) => `
@@ -552,37 +435,21 @@ log "Backup processing run finished."`
             </div>
         `).join('');
         
-        const ctx = document.getElementById('progressChart').getContext('2d');
-        if(progressChart) progressChart.destroy();
-        progressChart = new Chart(ctx, {
+        const ctx = document.getElementById('dataChart').getContext('2d');
+        if(dataChart) dataChart.destroy();
+        dataChart = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: ['Progress'],
-                datasets: [{
-                    label: 'Completed',
-                    data: [0],
-                    backgroundColor: '#3b82f6',
-                    borderRadius: 4,
-                }]
+                labels: ['Data Size'],
+                datasets: [
+                    { label: 'Full Backup', data: [100], backgroundColor: '#e2e8f0' },
+                    { label: 'Incremental', data: [0], backgroundColor: '#3b82f6' }
+                ]
             },
             options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        beginAtZero: true,
-                        max: 100,
-                        display: false,
-                    },
-                    y: {
-                        display: false,
-                    }
-                },
-                plugins: {
-                    legend: { display: false },
-                    tooltip: { enabled: false }
-                }
+                indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                scales: { x: { stacked: true, display: false }, y: { stacked: true, display: false } },
+                plugins: { legend: { position: 'bottom' }, tooltip: { enabled: false } }
             }
         });
     };
@@ -592,9 +459,8 @@ log "Backup processing run finished."`
             el.classList.toggle('active', i === currentStep);
         });
         
-        const progress = currentStep >= 0 ? ((currentStep + 1) / (workflowSteps.length - 1)) * 100 : 0;
-        progressChart.data.datasets[0].data[0] = progress;
-        progressChart.update('none');
+        dataChart.data.datasets[1].data[0] = (currentStep >= 2) ? 15 : 0;
+        dataChart.update('none');
 
         if (currentStep >= 0 && currentStep < workflowSteps.length) {
             statusText.textContent = `Status: ${workflowSteps[currentStep].text.split('.')[0]}`;
@@ -602,8 +468,14 @@ log "Backup processing run finished."`
             statusText.textContent = 'Status: Idle';
         }
 
-        if (currentStep === workflowSteps.length - 1) {
-            pause();
+        if (currentStep === 3) {
+            dataPacket.style.opacity = '1';
+            dataPacket.style.left = '80%';
+        } else if (currentStep < 3) {
+            dataPacket.style.transition = 'none';
+            dataPacket.style.opacity = '0';
+            dataPacket.style.left = '20%';
+            setTimeout(() => { dataPacket.style.transition = 'all 1s ease-in-out'; }, 50);
         }
     };
 
@@ -619,12 +491,9 @@ log "Backup processing run finished."`
     const play = () => {
         isPlaying = true;
         playPauseBtn.textContent = 'Pause';
+        if (currentStep >= workflowSteps.length - 1) reset();
         intervalId = setInterval(advanceStep, 1500);
-        if (currentStep === workflowSteps.length - 1) {
-            currentStep = -1;
-            updateWorkflowUI();
-        }
-        advanceStep();
+        if(currentStep === -1) advanceStep();
     };
 
     const pause = () => {
@@ -639,27 +508,11 @@ log "Backup processing run finished."`
         updateWorkflowUI();
     };
 
-    playPauseBtn.addEventListener('click', () => {
-        isPlaying ? pause() : play();
-    });
+
+
+    playPauseBtn.addEventListener('click', () => isPlaying ? pause() : play());
     resetBtn.addEventListener('click', reset);
 
-    // Checklist
-    const checklistContainer = document.getElementById('checklist');
-    checklistContainer.innerHTML = checklistItems.map(item => `
-        <div class="checklist-item flex items-center cursor-pointer group">
-            <div class="check-icon w-6 h-6 rounded-md border-2 border-slate-300 flex items-center justify-center mr-3 flex-shrink-0"></div>
-            <p class="text-slate-700 group-hover:text-blue-600">${item}</p>
-        </div>
-    `).join('');
-
-    checklistContainer.querySelectorAll('.checklist-item').forEach(item => {
-        item.addEventListener('click', () => {
-            item.classList.toggle('checked');
-        });
-    });
-
-    // Initializations
     initWorkflow();
     updateWorkflowUI();
 });
